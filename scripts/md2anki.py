@@ -20,8 +20,14 @@ from slugify import slugify
 
 
 def make_id(name: str) -> int:
-    """Generate stable integer ID from string."""
-    return int(hashlib.sha1(name.encode()).hexdigest()[:15], 16)
+    """Generate stable integer ID from string.
+
+    Limited to 13 hex chars (52 bits, max ~4.5e15) to stay within IEEE 754
+    double precision safe integer range (2^53). Java's JSONObject parses JSON
+    numbers as double, so IDs exceeding 2^53 lose precision and break lookups
+    in AnkiDroid's importer.
+    """
+    return int(hashlib.sha1(name.encode()).hexdigest()[:13], 16)
 
 
 _md = markdown.Markdown(extensions=["tables", "fenced_code", "nl2br"])
