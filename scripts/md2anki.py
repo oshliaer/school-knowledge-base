@@ -16,6 +16,7 @@ from pathlib import Path
 import genanki
 import markdown
 import yaml
+from slugify import slugify
 
 
 def make_id(name: str) -> int:
@@ -333,7 +334,8 @@ def build_subject(subject_dir: Path, output_dir: Path) -> Path:
                     total_cards += 1
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    safe_name = re.sub(r"[^\w\s-]", "", deck_name).strip().replace(" ", "_")
+
+    safe_name = slugify(deck_name)
     out_path = output_dir / f"{safe_name}.apkg"
 
     package = genanki.Package(all_decks)
