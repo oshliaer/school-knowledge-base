@@ -19,15 +19,28 @@ import yaml
 from slugify import slugify
 
 
+_SAFE_ID_MAX = 2**53 - 1  # IEEE 754 double precision safe integer limit
+
+
 def make_id(name: str) -> int:
     """Generate stable integer ID from string.
 
     Limited to 13 hex chars (52 bits, max ~4.5e15) to stay within IEEE 754
-    double precision safe integer range (2^53). Java's JSONObject parses JSON
-    numbers as double, so IDs exceeding 2^53 lose precision and break lookups
-    in AnkiDroid's importer.
+    double precision safe integer range (integers up to 2^53-1 inclusive).
+    Java's JSONObject parses JSON numbers as double, so IDs exceeding this
+    range lose precision and break lookups in AnkiDroid's importer.
     """
     return int(hashlib.sha1(name.encode()).hexdigest()[:13], 16)
+
+
+def _validate_id(value: int, label: str) -> None:
+    """Raise ValueError if value exceeds the safe integer range for AnkiDroid."""
+    if value > _SAFE_ID_MAX:
+        raise ValueError(
+            f"{label}: ID {value} превышает 2^53-1 ({_SAFE_ID_MAX}).\n"
+            "AnkiDroid парсит JSON-числа как double и потеряет точность.\n"
+            "Используйте число ≤ 9007199254740991 (например, timestamp из 13 цифр)."
+        )
 
 
 _md = markdown.Markdown(extensions=["tables", "fenced_code", "nl2br"])
@@ -237,6 +250,7 @@ def build_subject(subject_dir: Path, output_dir: Path) -> Path:
     config = yaml.safe_load(deck_config_path.read_text(encoding="utf-8"))
     deck_name = config["name"]
     deck_id = config.get("id") or make_id(deck_name)
+    _validate_id(deck_id, f"deck.yaml 'id' в {subject_dir.name}")
 
     models = build_models(deck_name)
 
