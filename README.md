@@ -73,7 +73,7 @@ tags: [доп-тег]      # дополнительные теги
 ## Требования
 
 - Python 3.11+
-- Зависимости: `genanki`, `markdown`, `PyYAML`
+- Зависимости: `genanki`, `markdown`, `PyYAML`, `python-slugify`
 
 ## CI/CD
 
