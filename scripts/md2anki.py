@@ -187,34 +187,10 @@ def parse_cards(md_file: Path, media_map: dict) -> list[dict]:
     return cards
 
 
-def build_models(deck_name: str) -> dict:
+def build_models(deck_name: str, subject_dir: Path) -> dict:
     """Create genanki models with stable IDs scoped to this deck."""
-    # CSS для базового оформления
-    css = """
-    @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap');
-    .card {
-        font-family: 'Open Sans', Arial, sans-serif;
-        font-size: 20px;
-        padding: 20px;
-    }
-    hr {
-        border: none;
-        border-top: 1px solid #ccc;
-        margin: 15px 0;
-    }
-    table {
-        border-collapse: collapse;
-        margin: 1em 0;
-    }
-    th, td {
-        border: 1px solid #ccc;
-        padding: 6px 10px;
-        text-align: left;
-    }
-    th {
-        background-color: #f2f2f2;
-    }
-    """
+    css_file = subject_dir / "styles.css"
+    css = css_file.read_text(encoding="utf-8") if css_file.exists() else ""
     return {
         "basic": genanki.Model(
             make_id(f"{deck_name}:model:basic"),
@@ -271,7 +247,7 @@ def build_subject(subject_dir: Path, output_dir: Path) -> Path:
     deck_id = config.get("id") or make_id(deck_name)
     _validate_id(deck_id, f"deck.yaml 'id' в {subject_dir.name}")
 
-    models = build_models(deck_name)
+    models = build_models(deck_name, subject_dir)
 
     top_deck = genanki.Deck(deck_id, deck_name)
     all_decks = [top_deck]
