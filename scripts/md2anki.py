@@ -101,7 +101,7 @@ def parse_cards(md_file: Path, media_map: dict) -> list[dict]:
 
         Extra info (optional)
     """
-    content = md_file.read_text(encoding="utf-8")
+    content = md_file.read_text(encoding="utf-8").replace("\r\n", "\n")
 
     # Extract YAML frontmatter
     meta = {}
@@ -161,10 +161,17 @@ def parse_cards(md_file: Path, media_map: dict) -> list[dict]:
             html = resolve_images(md_to_html(raw), md_file.parent, media_map)
             cards.append({"type": "cloze", "text": html, "extra": "", "tags": tags, "id": card_id})
         else:
-            # First paragraph (usually ## Heading) = front, rest = back
-            parts = re.split(r"\n\n", raw, maxsplit=1)
-            front_md = re.sub(r"^#{1,6}\s+", "", parts[0].strip())
-            back_md = parts[1].strip() if len(parts) > 1 else ""
+            # ^^^ on its own line (surrounded by blank lines) splits front and back.
+            # Regex tolerates extra spaces around ^^^ and varying blank-line counts.
+            sep_pattern = r"\n[ \t]*\n[ \t]*\^\^\^[ \t]*\n[ \t]*\n"
+            sep_match = re.search(sep_pattern, raw)
+            if not sep_match:
+                front_preview = raw.split('\n', 1)[0][:80]
+                print(f"  WARNING: пропущена карточка без разделителя ^^^: {front_preview}...", file=sys.stderr)
+                continue
+            front_md, back_md = raw[:sep_match.start()], raw[sep_match.end():]
+            front_md = re.sub(r"^#{1,6}\s+", "", front_md.strip())
+            back_md = back_md.strip()
 
             front_html = resolve_images(md_to_html(front_md), md_file.parent, media_map)
             back_html = resolve_images(md_to_html(back_md), md_file.parent, media_map)
@@ -180,22 +187,10 @@ def parse_cards(md_file: Path, media_map: dict) -> list[dict]:
     return cards
 
 
-def build_models(deck_name: str) -> dict:
+def build_models(deck_name: str, subject_dir: Path) -> dict:
     """Create genanki models with stable IDs scoped to this deck."""
-    # CSS для базового оформления
-    css = """
-    @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap');
-    .card {
-        font-family: 'Open Sans', Arial, sans-serif;
-        font-size: 20px;
-        padding: 20px;
-    }
-    hr {
-        border: none;
-        border-top: 1px solid #ccc;
-        margin: 15px 0;
-    }
-    """
+    css_file = subject_dir / "styles.css"
+    css = css_file.read_text(encoding="utf-8") if css_file.exists() else ""
     return {
         "basic": genanki.Model(
             make_id(f"{deck_name}:model:basic"),
@@ -252,7 +247,7 @@ def build_subject(subject_dir: Path, output_dir: Path) -> Path:
     deck_id = config.get("id") or make_id(deck_name)
     _validate_id(deck_id, f"deck.yaml 'id' в {subject_dir.name}")
 
-    models = build_models(deck_name)
+    models = build_models(deck_name, subject_dir)
 
     top_deck = genanki.Deck(deck_id, deck_name)
     all_decks = [top_deck]
