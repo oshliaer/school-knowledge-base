@@ -1,3 +1,19 @@
+## [1.2.0] — 2026-03-14
+
+### Добавлено
+- `scripts/fetch_flags.py`: лимит размера SVG `MAX_FLAG_SIZE = 350 КБ` — для больших SVG скачивается PNG-рендер с Wikimedia (`?width=300`) через `_png_fallback_url()`
+- `scripts/fetch_flags.py`: авторесайз PNG/JPEG через Pillow — max height 300px (2x retina) через `_resize_raster()`
+- `scripts/fetch_flags.py`: поддержка JPEG (`image/jpeg`) в `_fetch_url()`
+- `scripts/fetch_flags.py`: поддержка `.jpg` в orphan-cleanup и `resolve_cached()`
+- Новые функции в `fetch_flags.py`: `_fetch_url()`, `_png_fallback_url()`, `_resize_raster()`
+- Счётчик размера при fallback: сообщение показывает исходный размер SVG и размер итогового PNG (e.g., `SVG слишком большой (594 КБ → PNG 300px, 18 КБ)`)
+
+### Изменено
+- `scripts/fetch_flags.py`: счётчик `missing` переименован → `limited` (большие SVG уже не \"отсутствуют\", а ограничены размером)
+- `requirements.txt`: добавлен `Pillow` для обработки растровых изображений
+- `.github/workflows/notify-telegram.yml`: рефакторинг многострочного сообщения — текст передаётся через env var `TG_MESSAGE` и файл `/tmp/tg_msg.txt`; curl использует `--data-urlencode "text@/tmp/tg_msg.txt"` и флаг `-g` для отключения URL-globbing (исправляет ошибки с `[` и `\"` в markdown-ссылках)
+- `География мира/overrides.yaml`: добавлены ручные переопределения флагов для Q142 (Франция/Париж) и Q32 (Люксембург/Люксембург) — использованы флаги городов вместо флагов стран
+
 ## [1.1.1] — 2026-03-14
 
 ### Исправлено
