@@ -101,7 +101,7 @@ def parse_cards(md_file: Path, media_map: dict) -> list[dict]:
 
         Extra info (optional)
     """
-    content = md_file.read_text(encoding="utf-8")
+    content = md_file.read_text(encoding="utf-8").replace("\r\n", "\n")
 
     # Extract YAML frontmatter
     meta = {}
@@ -162,11 +162,14 @@ def parse_cards(md_file: Path, media_map: dict) -> list[dict]:
             cards.append({"type": "cloze", "text": html, "extra": "", "tags": tags, "id": card_id})
         else:
             # ^^^ on its own line (surrounded by blank lines) splits front and back.
-            if "\n\n^^^\n\n" not in raw:
-                front_preview = raw[:60].replace("\n", " ")
+            # Regex tolerates extra spaces around ^^^ and varying blank-line counts.
+            sep_pattern = r"\n[ \t]*\n[ \t]*\^\^\^[ \t]*\n[ \t]*\n"
+            sep_match = re.search(sep_pattern, raw)
+            if not sep_match:
+                front_preview = raw.split('\n', 1)[0][:80]
                 print(f"  WARNING: пропущена карточка без разделителя ^^^: {front_preview}...", file=sys.stderr)
                 continue
-            front_md, back_md = raw.split("\n\n^^^\n\n", 1)
+            front_md, back_md = raw[:sep_match.start()], raw[sep_match.end():]
             front_md = re.sub(r"^#{1,6}\s+", "", front_md.strip())
             back_md = back_md.strip()
 
@@ -198,6 +201,18 @@ def build_models(deck_name: str) -> dict:
         border: none;
         border-top: 1px solid #ccc;
         margin: 15px 0;
+    }
+    table {
+        border-collapse: collapse;
+        margin: 1em 0;
+    }
+    th, td {
+        border: 1px solid #ccc;
+        padding: 6px 10px;
+        text-align: left;
+    }
+    th {
+        background-color: #f2f2f2;
     }
     """
     return {
