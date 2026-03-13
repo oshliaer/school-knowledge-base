@@ -1,0 +1,6 @@
+# Ручные исправления данных Wikidata.
+# Ключ — Wikidata ID страны (Q-номер).
+# Применяются поверх данных из Wikidata при запуске fetch_countries.py.
+
+Q408:  # Австралия / Канберра
+  capital_flag_url: https://commons.wikimedia.org/wiki/Special:FilePath/Flag_of_the_Australian_Capital_Territory.svg
