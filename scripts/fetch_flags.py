@@ -51,7 +51,12 @@ def download_flag(url: str, cache_dir: Path) -> str:
             )
             with urllib.request.urlopen(req, timeout=30) as resp:
                 content_type = resp.headers.get("Content-Type", "")
-                ext = "png" if "png" in content_type else "svg"
+                if "svg" in content_type:
+                    ext = "svg"
+                elif "png" in content_type:
+                    ext = "png"
+                else:
+                    raise RuntimeError(f"Неизвестный Content-Type '{content_type}' для {url}")
                 fname = f"{hash_}.{ext}"
                 (cache_dir / fname).write_bytes(resp.read())
             return fname
@@ -66,7 +71,12 @@ def download_flag(url: str, cache_dir: Path) -> str:
 def main():
     parser = argparse.ArgumentParser(description="Download missing flags, update CSV with filenames")
     parser.add_argument("--input", "-i", default="География мира/countries.csv")
-    parser.add_argument("--limit", type=int, default=None, help="Максимум новых скачиваний")
+    def positive_int(value: str) -> int:
+        ivalue = int(value)
+        if ivalue <= 0:
+            raise argparse.ArgumentTypeError("--limit должен быть > 0")
+        return ivalue
+    parser.add_argument("--limit", type=positive_int, default=None, help="Максимум новых скачиваний")
     parser.add_argument("--replace-png", action="store_true",
                         help="Заменить PNG в кэше на SVG (скачать заново)")
     args = parser.parse_args()
@@ -109,7 +119,9 @@ def main():
                     continue
 
             if args.limit is not None and downloaded >= args.limit:
-                row[file_field] = ""
+                # Не затираем уже закэшированное значение
+                if not row.get(file_field):
+                    row[file_field] = ""
                 limited += 1
                 continue
 
@@ -141,6 +153,8 @@ def main():
     }
     removed = 0
     for fpath in cache_dir.iterdir():
+        if not fpath.is_file() or fpath.suffix not in (".svg", ".png"):
+            continue
         if fpath.name not in referenced:
             fpath.unlink()
             print(f"  🗑 удалён orphan: {fpath.name}", file=sys.stderr)

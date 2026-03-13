@@ -44,6 +44,8 @@ WHERE {
   ?country wdt:P297 ?isoCode .
   # Исключаем исторические государства (имеющие дату роспуска P576)
   FILTER NOT EXISTS { ?country wdt:P576 [] }
+  # Исключаем географические объекты (острова и т.п.)
+  FILTER NOT EXISTS { ?country wdt:P31 wd:Q23442 }
   ?country wdt:P36 ?capital .
 
   OPTIONAL { ?country wdt:P41 ?countryFlag . }
@@ -201,7 +203,21 @@ def main():
                 row.update(patch)
                 print(f"  override: {row['country']} ({row['wikidata_id']})", file=sys.stderr)
 
-    fieldnames = ["wikidata_id", "country", "capital", "country_flag_url", "capital_flag_url", "capital_population", "capital_area", "capital_density", "capital_timezone"]
+    # Сохраняем *_flag_file из предыдущего CSV, чтобы не потерять кэш флагов
+    existing_flags: dict[str, dict] = {}
+    if output_path.exists():
+        with output_path.open(encoding="utf-8", newline="") as f:
+            for r in csv.DictReader(f):
+                existing_flags[r["wikidata_id"]] = {
+                    "country_flag_file": r.get("country_flag_file", ""),
+                    "capital_flag_file": r.get("capital_flag_file", ""),
+                }
+    for row in rows:
+        prev = existing_flags.get(row["wikidata_id"], {})
+        row.setdefault("country_flag_file", prev.get("country_flag_file", ""))
+        row.setdefault("capital_flag_file", prev.get("capital_flag_file", ""))
+
+    fieldnames = ["wikidata_id", "country", "capital", "country_flag_url", "country_flag_file", "capital_flag_url", "capital_flag_file", "capital_population", "capital_area", "capital_density", "capital_timezone"]
     with output_path.open("w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
