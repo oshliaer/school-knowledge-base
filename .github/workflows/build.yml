@@ -49,7 +49,12 @@ jobs:
         id: tg_message
         run: |
           MSG=$(.venv/bin/python .github/scripts/build_tg_message.py "${{ github.ref_name }}" "${{ github.repository }}")
-          echo "message=${MSG}" >> $GITHUB_OUTPUT
+          {
+            echo 'message<<EOF'
+            printf '%s' "$MSG"
+            echo
+            echo 'EOF'
+          } >> $GITHUB_OUTPUT
 
   notify:
     needs: build

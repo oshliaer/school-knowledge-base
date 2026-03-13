@@ -116,4 +116,4 @@ hr {
 
 ## CI/CD
 
-GitHub Actions автоматически собирает колоды при пуше в ветку `master` и создаёт релиз по тегу `v*`. После успешной сборки при пуше тага отправляется уведомление в Telegram (через reusable workflow `notify-telegram.yml`).
+GitHub Actions автоматически собирает колоды при пуше в ветку `master` и создаёт релиз по тегу `v*`. После успешной сборки при пуше тега отправляется уведомление в Telegram (через reusable workflow `notify-telegram.yml`).
