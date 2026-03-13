@@ -255,7 +255,7 @@ def build_subject(subject_dir: Path, output_dir: Path) -> Path:
 
     decks_dir = subject_dir / "decks"
     if not decks_dir.exists():
-        raise FileNotFoundError(f"decks/ directory not found in {subject_dir}")
+        return None  # CSV-колода или другой пайплайн — пропускаем
 
     # Поддерживаем оба формата:
     # 1. Файлы напрямую в decks/ (decks/01-тема.md)

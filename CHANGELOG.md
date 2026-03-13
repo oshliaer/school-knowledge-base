@@ -1,3 +1,9 @@
+## [1.1.1] — 2026-03-14
+
+### Исправлено
+- `scripts/md2anki.py`: папки без `decks/` теперь пропускаются (return None) вместо падения с ошибкой — добавлена совместимость с CSV-колодами в том же репозитории
+- `.github/workflows/build.yml`: переименован шаг "Build decks" → "Build Markdown decks", добавлен шаг "Build CSV decks" с вызовом `csv2anki.py`
+
 ## [1.1.0] — 2026-03-13
 
 ### Добавлено

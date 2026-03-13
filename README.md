@@ -2,7 +2,7 @@
 
 Конвертация Markdown-карточек в колоды Anki (.apkg).
 
-**Версия:** 1.1.0 | [Релизы](https://github.com/oshliaer/school-knowledge-base/releases)
+**Версия:** 1.1.1 | [Релизы](https://github.com/oshliaer/school-knowledge-base/releases)
 
 ## Быстрый старт
 
