@@ -2,11 +2,10 @@
 """Convert countries CSV to Anki .apkg deck.
 
 Reads countries.csv with columns:
-    country, capital, country_flag_url, capital_flag_url
+    country, capital, country_flag_file, capital_flag_file (и другие)
 
-Generates two card templates per note:
+Generates one card template per note:
     Card 1: Country + flag → Capital
-    Card 2: Capital → Country + flag
 
 Usage:
     python scripts/csv2anki.py
@@ -25,9 +24,6 @@ from pathlib import Path
 import genanki
 import yaml
 from slugify import slugify
-
-
-_SAFE_ID_MAX = 2**53 - 1
 
 
 def make_id(name: str) -> int:

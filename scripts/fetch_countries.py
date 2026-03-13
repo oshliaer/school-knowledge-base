@@ -22,10 +22,10 @@ import yaml
 SPARQL_ENDPOINT = "https://query.wikidata.org/sparql"
 
 # Запрос: страны (независимые государства) + столицы + флаги
-# - P31/wdt:P279* Q3624078 = независимое государство
+# - P297 = ISO 3166-1 код (только реальные государства)
+# - P576 = дата роспуска (исключаем исторические государства)
 # - P36 = столица
-# - P41 = флаг (изображение)
-# - P18 = изображение (запасной вариант для флагов столиц)
+# - P41 = флаг страны / флаг столицы
 # - rdfs:label на русском
 SPARQL_QUERY = """
 SELECT DISTINCT
@@ -37,6 +37,7 @@ SELECT DISTINCT
   ?capitalPopulation
   ?capitalPopDate
   ?capitalArea
+  ?capitalAreaUnit
   ?tzLabel
 WHERE {
   # Только страны с ISO 3166-1 кодом (реальные государства)
@@ -47,7 +48,12 @@ WHERE {
 
   OPTIONAL { ?country wdt:P41 ?countryFlag . }
   OPTIONAL { ?capital wdt:P41 ?capitalFlag . }
-  OPTIONAL { ?capital wdt:P2046 ?capitalArea . }
+  OPTIONAL {
+    ?capital p:P2046 ?areaSt .
+    ?areaSt psv:P2046 ?areaVal .
+    ?areaVal wikibase:quantityAmount ?capitalArea .
+    ?areaVal wikibase:quantityUnit ?capitalAreaUnit .
+  }
   OPTIONAL { ?capital wdt:P421 ?tz . }
   # Население с датой — берём последнее по дате в Python
   OPTIONAL {
@@ -107,7 +113,16 @@ def fetch_wikidata(query: str, limit: int | None = None) -> list[dict]:
 
         population = b.get("capitalPopulation", {}).get("value", "")
         pop_date = b.get("capitalPopDate", {}).get("value", "")
-        area = b.get("capitalArea", {}).get("value", "")
+        area_raw = b.get("capitalArea", {}).get("value", "")
+        area_unit = b.get("capitalAreaUnit", {}).get("value", "")
+        # Q25343 = m², Q712226 = km²; конвертируем всё в км²
+        try:
+            area_val = float(area_raw) if area_raw else None
+            if area_val is not None and "Q25343" in area_unit:
+                area_val = area_val / 1_000_000
+            area = str(round(area_val, 2)) if area_val is not None else ""
+        except ValueError:
+            area = ""
         try:
             density = round(float(population) / float(area)) if population and area else ""
         except (ValueError, ZeroDivisionError):
@@ -158,7 +173,12 @@ def deduplicate(rows: list[dict]) -> list[dict]:
 def main():
     parser = argparse.ArgumentParser(description="Fetch countries from Wikidata")
     parser.add_argument("--output", "-o", default="География мира/countries.csv")
-    parser.add_argument("--limit", type=int, default=None, help="Ограничить число записей (для теста)")
+    def positive_int(value: str) -> int:
+        ivalue = int(value)
+        if ivalue <= 0:
+            raise argparse.ArgumentTypeError("--limit должен быть > 0")
+        return ivalue
+    parser.add_argument("--limit", type=positive_int, default=None, help="Ограничить число записей (для теста)")
     args = parser.parse_args()
 
     repo_root = Path(__file__).parent.parent

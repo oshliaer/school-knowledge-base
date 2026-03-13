@@ -13,6 +13,7 @@ import csv
 import hashlib
 import sys
 import time
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -36,10 +37,12 @@ def resolve_cached(url: str, cache_dir: Path) -> str | None:
     return None
 
 
-def download_svg(url: str, cache_dir: Path) -> str:
-    """Download SVG to cache, return filename. Raises on failure."""
-    fname = hashlib.md5(url.encode()).hexdigest()[:12] + ".svg"
-    fpath = cache_dir / fname
+def download_flag(url: str, cache_dir: Path) -> str:
+    """Download flag to cache, return filename. Extension determined from Content-Type. Raises on failure."""
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in {"http", "https"}:
+        raise RuntimeError(f"Неподдерживаемая схема URL: {url}")
+    hash_ = hashlib.md5(url.encode()).hexdigest()[:12]
     for attempt in range(5):
         try:
             req = urllib.request.Request(
@@ -47,7 +50,10 @@ def download_svg(url: str, cache_dir: Path) -> str:
                 headers={"User-Agent": "school-knowledge-base/1.0 (https://github.com/oshliaer/school-knowledge-base)"},
             )
             with urllib.request.urlopen(req, timeout=30) as resp:
-                fpath.write_bytes(resp.read())
+                content_type = resp.headers.get("Content-Type", "")
+                ext = "png" if "png" in content_type else "svg"
+                fname = f"{hash_}.{ext}"
+                (cache_dir / fname).write_bytes(resp.read())
             return fname
         except Exception as e:
             if attempt == 4:
@@ -88,6 +94,7 @@ def main():
                 continue
 
             cached = resolve_cached(url, cache_dir)
+            old_png_to_remove = None
             if cached:
                 if args.replace_png and cached.endswith(".png"):
                     # Удаляем PNG только если лимит позволяет скачать SVG
@@ -95,7 +102,7 @@ def main():
                         row[file_field] = cached
                         skipped += 1
                         continue
-                    (cache_dir / cached).unlink()
+                    old_png_to_remove = cache_dir / cached
                 else:
                     row[file_field] = cached
                     skipped += 1
@@ -107,7 +114,10 @@ def main():
                 continue
 
             try:
-                fname = download_svg(url, cache_dir)
+                fname = download_flag(url, cache_dir)
+                # Удаляем старый PNG только после успешной загрузки
+                if old_png_to_remove and old_png_to_remove.exists():
+                    old_png_to_remove.unlink()
                 row[file_field] = fname
                 print(f"  ✓ {fname}  {url.split('/')[-1]}")
                 downloaded += 1
