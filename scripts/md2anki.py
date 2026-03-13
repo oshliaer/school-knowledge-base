@@ -161,10 +161,14 @@ def parse_cards(md_file: Path, media_map: dict) -> list[dict]:
             html = resolve_images(md_to_html(raw), md_file.parent, media_map)
             cards.append({"type": "cloze", "text": html, "extra": "", "tags": tags, "id": card_id})
         else:
-            # First paragraph (usually ## Heading) = front, rest = back
-            parts = re.split(r"\n\n", raw, maxsplit=1)
-            front_md = re.sub(r"^#{1,6}\s+", "", parts[0].strip())
-            back_md = parts[1].strip() if len(parts) > 1 else ""
+            # ^^^ on its own line (surrounded by blank lines) splits front and back.
+            if "\n\n^^^\n\n" not in raw:
+                front_preview = raw[:60].replace("\n", " ")
+                print(f"  WARNING: пропущена карточка без разделителя ^^^: {front_preview}...", file=sys.stderr)
+                continue
+            front_md, back_md = raw.split("\n\n^^^\n\n", 1)
+            front_md = re.sub(r"^#{1,6}\s+", "", front_md.strip())
+            back_md = back_md.strip()
 
             front_html = resolve_images(md_to_html(front_md), md_file.parent, media_map)
             back_html = resolve_images(md_to_html(back_md), md_file.parent, media_map)
