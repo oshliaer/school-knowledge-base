@@ -16,6 +16,7 @@ Usage:
 
 import argparse
 import csv
+import hashlib
 import sys
 import time
 import urllib.request
