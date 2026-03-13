@@ -1,3 +1,12 @@
+## [1.0.2] — 2026-03-13
+
+### Добавлено
+- Скрипт `.github/scripts/build_tg_message.py` — формирует текст Telegram-сообщения с заголовком (тег релиза) и отдельными ссылками на скачивание для каждой колоды (имя из `deck.yaml`, slug из имени `.apkg`-файла)
+
+### Изменено
+- Workflow `.github/workflows/notify-telegram.yml`: переработан на приём готового текста (`message`) вместо `tag`+`repository`
+- Workflow `.github/workflows/build.yml`: добавлен шаг "Build Telegram message", который вызывает `build_tg_message.py` и передаёт результат в job `notify` через output
+
 ## [1.0.1] — 2026-03-13
 
 ### Добавлено

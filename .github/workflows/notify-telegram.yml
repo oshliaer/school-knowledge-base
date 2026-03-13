@@ -3,10 +3,7 @@ name: Notify Telegram
 on:
   workflow_call:
     inputs:
-      tag:
-        required: true
-        type: string
-      repository:
+      message:
         required: true
         type: string
     secrets:
@@ -21,9 +18,8 @@ jobs:
     steps:
       - name: Send message
         run: |
-          TEXT="📦 Новый релиз *${{ inputs.tag }}* опубликован\!%0A[Скачать колоды](https://github.com/${{ inputs.repository }}/releases/latest)"
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d "text=${TEXT}" \
+            --data-urlencode "text=${{ inputs.message }}" \
             -d "parse_mode=MarkdownV2" \
             -d "disable_web_page_preview=true"

@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      tg_message: ${{ steps.tg_message.outputs.message }}
 
     steps:
       - uses: actions/checkout@v4
@@ -42,14 +44,19 @@ jobs:
           files: dist/*.apkg
           generate_release_notes: true
 
+      - name: Build Telegram message
+        if: startsWith(github.ref, 'refs/tags/')
+        id: tg_message
+        run: |
+          MSG=$(.venv/bin/python .github/scripts/build_tg_message.py "${{ github.ref_name }}" "${{ github.repository }}")
+          echo "message=${MSG}" >> $GITHUB_OUTPUT
 
   notify:
     needs: build
     if: startsWith(github.ref, 'refs/tags/')
     uses: ./.github/workflows/notify-telegram.yml
     with:
-      tag: ${{ github.ref_name }}
-      repository: ${{ github.repository }}
+      message: ${{ needs.build.outputs.tg_message }}
     secrets:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
