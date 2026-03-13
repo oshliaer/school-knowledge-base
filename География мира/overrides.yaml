@@ -2,5 +2,11 @@
 # Ключ — Wikidata ID страны (Q-номер).
 # Применяются поверх данных из Wikidata при запуске fetch_countries.py.
 
+Q142:  # Франция / Париж — упрощённый флаг вместо детализированного герба (19 МБ)
+  capital_flag_url: https://commons.wikimedia.org/wiki/Special:FilePath/Flag_of_Paris_with_coat_of_arms.svg
+
+Q32:  # Люксембург / Люксембург — флаг города вместо герба (15 МБ)
+  capital_flag_url: https://commons.wikimedia.org/wiki/Special:FilePath/Flag_of_Luxembourg_(city).svg
+
 Q408:  # Австралия / Канберра
   capital_flag_url: https://commons.wikimedia.org/wiki/Special:FilePath/Flag_of_the_Australian_Capital_Territory.svg

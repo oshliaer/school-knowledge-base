@@ -2,7 +2,7 @@
 
 Конвертация Markdown-карточек в колоды Anki (.apkg).
 
-**Версия:** 1.1.1 | [Релизы](https://github.com/oshliaer/school-knowledge-base/releases)
+**Версия:** 1.2.0 | [Релизы](https://github.com/oshliaer/school-knowledge-base/releases)
 
 ## Быстрый старт
 
@@ -115,7 +115,7 @@ hr {
 ## Требования
 
 - Python 3.11+
-- Зависимости: `genanki`, `markdown`, `PyYAML`, `python-slugify`
+- Зависимости: `genanki`, `markdown`, `PyYAML`, `python-slugify`, `Pillow`
 
 ## CI/CD
 

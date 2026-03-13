@@ -11,11 +11,14 @@ Usage:
 import argparse
 import csv
 import hashlib
+import io
 import sys
 import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
+
+from PIL import Image
 
 
 FIELDNAMES = [
@@ -27,38 +30,80 @@ FIELDNAMES = [
 
 
 def resolve_cached(url: str, cache_dir: Path) -> str | None:
-    """Return cached filename (SVG or PNG) if exists, else None."""
+    """Return cached filename if exists and within size limit, else None.
+    Oversized SVGs are treated as not cached so they get re-downloaded as PNG."""
     if not url:
         return None
     hash_ = hashlib.md5(url.encode()).hexdigest()[:12]
-    for ext in ("svg", "png"):
-        if (cache_dir / f"{hash_}.{ext}").exists():
+    for ext in ("svg", "png", "jpg"):
+        fpath = cache_dir / f"{hash_}.{ext}"
+        if fpath.exists():
+            if ext == "svg" and fpath.stat().st_size > MAX_FLAG_SIZE:
+                return None  # перекачать как PNG
             return f"{hash_}.{ext}"
     return None
 
 
+MAX_FLAG_SIZE = 350 * 1024  # 350 КБ — геральдические SVG могут весить десятки МБ
+PNG_FALLBACK_WIDTH = 300    # ширина PNG-рендера при fallback (карточки отображают флаги 150px высотой)
+MAX_RASTER_HEIGHT = 300     # макс. высота PNG/JPEG (2x retina; CSS показывает 150px)
+
+
+def _fetch_url(url: str) -> tuple[bytes, str]:
+    """Fetch URL, return (data, extension). Raises RuntimeError on bad Content-Type."""
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": "school-knowledge-base/1.0 (https://github.com/oshliaer/school-knowledge-base)"},
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        content_type = resp.headers.get("Content-Type", "")
+        if "svg" in content_type:
+            ext = "svg"
+        elif "png" in content_type:
+            ext = "png"
+        elif "jpeg" in content_type or "jpg" in content_type:
+            ext = "jpg"
+        else:
+            raise RuntimeError(f"Неизвестный Content-Type '{content_type}' для {url}")
+        return resp.read(), ext
+
+
+def resize_raster(data: bytes, ext: str) -> bytes:
+    """Resize PNG/JPEG to MAX_RASTER_HEIGHT if taller, preserving aspect ratio."""
+    img = Image.open(io.BytesIO(data))
+    if img.height <= MAX_RASTER_HEIGHT:
+        return data
+    new_w = round(img.width * MAX_RASTER_HEIGHT / img.height)
+    img = img.resize((new_w, MAX_RASTER_HEIGHT), Image.LANCZOS)
+    buf = io.BytesIO()
+    fmt = "JPEG" if ext == "jpg" else "PNG"
+    img.save(buf, format=fmt, optimize=True)
+    return buf.getvalue()
+
+
+def _png_fallback_url(svg_url: str) -> str:
+    """Return Wikimedia PNG-render URL for a Special:FilePath SVG URL."""
+    return f"{svg_url}{'&' if '?' in svg_url else '?'}width={PNG_FALLBACK_WIDTH}"
+
+
 def download_flag(url: str, cache_dir: Path) -> str:
-    """Download flag to cache, return filename. Extension determined from Content-Type. Raises on failure."""
+    """Download flag to cache, return filename. Extension determined from Content-Type.
+    If SVG exceeds MAX_FLAG_SIZE, falls back to PNG render from Wikimedia. Raises on failure."""
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme not in {"http", "https"}:
         raise RuntimeError(f"Неподдерживаемая схема URL: {url}")
     hash_ = hashlib.md5(url.encode()).hexdigest()[:12]
     for attempt in range(5):
         try:
-            req = urllib.request.Request(
-                url,
-                headers={"User-Agent": "school-knowledge-base/1.0 (https://github.com/oshliaer/school-knowledge-base)"},
-            )
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                content_type = resp.headers.get("Content-Type", "")
-                if "svg" in content_type:
-                    ext = "svg"
-                elif "png" in content_type:
-                    ext = "png"
-                else:
-                    raise RuntimeError(f"Неизвестный Content-Type '{content_type}' для {url}")
-                fname = f"{hash_}.{ext}"
-                (cache_dir / fname).write_bytes(resp.read())
+            data, ext = _fetch_url(url)
+            if ext == "svg" and len(data) > MAX_FLAG_SIZE:
+                svg_kb = len(data) // 1024
+                data, ext = _fetch_url(_png_fallback_url(url))
+                print(f"    SVG слишком большой ({svg_kb} КБ → PNG {PNG_FALLBACK_WIDTH}px, {len(data) // 1024} КБ)", file=sys.stderr)
+            if ext in ("png", "jpg"):
+                data = resize_raster(data, ext)
+            fname = f"{hash_}.{ext}"
+            (cache_dir / fname).write_bytes(data)
             return fname
         except Exception as e:
             if attempt == 4:
@@ -153,7 +198,7 @@ def main():
     }
     removed = 0
     for fpath in cache_dir.iterdir():
-        if not fpath.is_file() or fpath.suffix not in (".svg", ".png"):
+        if not fpath.is_file() or fpath.suffix not in (".svg", ".png", ".jpg"):
             continue
         if fpath.name not in referenced:
             fpath.unlink()
