@@ -2,7 +2,7 @@
 
 Конвертация Markdown-карточек в колоды Anki (.apkg).
 
-**Версия:** 1.0.0 | [Релизы](https://github.com/oshliaer/school-knowledge-base/releases)
+**Версия:** 1.0.1 | [Релизы](https://github.com/oshliaer/school-knowledge-base/releases)
 
 ## Быстрый старт
 
@@ -116,4 +116,4 @@ hr {
 
 ## CI/CD
 
-GitHub Actions автоматически собирает колоды при пуше в ветку `master` и создаёт релиз по тегу `v*`.
+GitHub Actions автоматически собирает колоды при пуше в ветку `master` и создаёт релиз по тегу `v*`. После успешной сборки при пуше тага отправляется уведомление в Telegram (через reusable workflow `notify-telegram.yml`).
