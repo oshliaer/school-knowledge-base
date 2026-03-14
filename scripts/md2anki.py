@@ -237,7 +237,11 @@ def build_models(deck_name: str, subject_dir: Path) -> dict:
 
 
 def build_subject(subject_dir: Path, output_dir: Path) -> Path | None:
-    """Build a single .apkg from a subject directory."""
+    """Build a single .apkg from a subject directory.
+
+    Returns the path to the generated .apkg, or None if the directory has no
+    decks/ folder (e.g. CSV-based pipeline — skipped silently).
+    """
     deck_config_path = subject_dir / "deck.yaml"
     if not deck_config_path.exists():
         raise FileNotFoundError(f"deck.yaml not found in {subject_dir}")
