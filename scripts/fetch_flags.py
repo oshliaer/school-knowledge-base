@@ -24,10 +24,23 @@ from PIL import Image
 FLAGS_FIELDNAMES = ["wikidata_id", "country_flag_file", "capital_flag_file"]
 
 
-OVERSIZED = object()  # sentinel: SVG есть в кэше, но слишком большой
+class _Oversized:
+    """Sentinel: SVG есть в кэше, но превышает MAX_FLAG_SIZE — нужно скачать PNG."""
+    _instance: "_Oversized | None" = None
+
+    def __new__(cls) -> "_Oversized":
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __repr__(self) -> str:
+        return "OVERSIZED"
 
 
-def resolve_cached(url: str, cache_dir: Path) -> str | None | object:
+OVERSIZED = _Oversized()
+
+
+def resolve_cached(url: str, cache_dir: Path) -> str | None | _Oversized:
     """Return cached filename, OVERSIZED sentinel, or None.
     OVERSIZED означает: SVG есть локально, но превышает MAX_FLAG_SIZE — нужно скачать PNG."""
     if not url:
@@ -66,7 +79,7 @@ def _fetch_url(url: str) -> tuple[bytes, str]:
         return resp.read(), ext
 
 
-def resize_raster(data: bytes, ext: str) -> bytes:
+def _resize_raster(data: bytes, ext: str) -> bytes:
     """Resize PNG/JPEG to MAX_RASTER_HEIGHT if taller, preserving aspect ratio."""
     img = Image.open(io.BytesIO(data))
     if img.height <= MAX_RASTER_HEIGHT:
@@ -100,7 +113,7 @@ def download_flag(url: str, cache_dir: Path, key_url: str | None = None) -> str:
                 data, ext = _fetch_url(_png_fallback_url(key_url or url))
                 print(f"    SVG слишком большой ({svg_kb} КБ → PNG {PNG_FALLBACK_WIDTH}px, {len(data) // 1024} КБ)", file=sys.stderr)
             if ext in ("png", "jpg"):
-                data = resize_raster(data, ext)
+                data = _resize_raster(data, ext)
             fname = f"{hash_}.{ext}"
             (cache_dir / fname).write_bytes(data)
             return fname
@@ -200,7 +213,7 @@ def main():
             try:
                 key_url = url if fetch_url != url else None
                 fname = download_flag(fetch_url, cache_dir, key_url=key_url)
-                if old_png_to_remove and old_png_to_remove.exists():
+                if old_png_to_remove and old_png_to_remove.exists() and old_png_to_remove.name != fname:
                     old_png_to_remove.unlink()
                 flag_row[file_field] = fname
                 size_kb = (cache_dir / fname).stat().st_size // 1024
