@@ -1,3 +1,16 @@
+## [1.3.1] — 2026-03-14
+
+### Изменено
+- `requirements.txt`: уточнена минимальная версия `Pillow>=10.0.0`
+- `scripts/fetch_flags.py`: `OVERSIZED` переработан из `object()` в singleton-класс `_Oversized` с `__repr__`
+- `scripts/fetch_flags.py`: `resize_raster()` переименована в `_resize_raster()` (приватный API)
+- `scripts/md2anki.py`: возвращаемый тип `build_subject()` уточнён как `Path | None`
+- `scripts/md2anki.py`: добавлено логирование пропущенных папок без `decks/` (CSV-пайплайн и другие)
+
+### Исправлено
+- `scripts/fetch_flags.py`: при обновлении флага старый PNG не удаляется, если имя совпадает с новым (защита от случайного удаления)
+- `География мира/countries.csv`: обновлены данные
+
 ## [1.3.0] — 2026-03-14
 
 ### Добавлено
