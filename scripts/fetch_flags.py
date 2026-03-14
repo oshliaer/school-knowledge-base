@@ -17,6 +17,7 @@ import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
+from typing import Self
 
 from PIL import Image
 
@@ -26,9 +27,9 @@ FLAGS_FIELDNAMES = ["wikidata_id", "country_flag_file", "capital_flag_file"]
 
 class _Oversized:
     """Sentinel: SVG есть в кэше, но превышает MAX_FLAG_SIZE — нужно скачать PNG."""
-    _instance: "_Oversized | None" = None
+    _instance: Self | None = None
 
-    def __new__(cls) -> "_Oversized":
+    def __new__(cls) -> Self:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
