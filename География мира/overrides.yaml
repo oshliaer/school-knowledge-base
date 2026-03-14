@@ -1,6 +1,9 @@
 # Ручные исправления данных Wikidata.
 # Ключ — Wikidata ID страны (Q-номер).
 # Применяются поверх данных из Wikidata при запуске fetch_countries.py.
+#
+# exclude: true — полностью исключить строку из CSV
+# Остальные поля перезаписывают значения из Wikidata.
 
 Q142:  # Франция / Париж — упрощённый флаг вместо детализированного герба (19 МБ)
   capital_flag_url: https://commons.wikimedia.org/wiki/Special:FilePath/Flag_of_Paris_with_coat_of_arms.svg
@@ -10,3 +13,9 @@ Q32:  # Люксембург / Люксембург — флаг города в
 
 Q408:  # Австралия / Канберра
   capital_flag_url: https://commons.wikimedia.org/wiki/Special:FilePath/Flag_of_the_Australian_Capital_Territory.svg
+
+Q35:  # Дания — членство в ООН записано на Q756617 (Датское королевство), исправляем вручную
+  un_member: "true"
+
+Q1410:  # Гибралтар — заморская территория Великобритании, ошибочно классифицирована как Q3624078
+  exclude: true
