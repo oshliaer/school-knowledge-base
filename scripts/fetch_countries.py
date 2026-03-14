@@ -21,8 +21,9 @@ import yaml
 
 SPARQL_ENDPOINT = "https://query.wikidata.org/sparql"
 
-# Запрос: страны (независимые государства) + столицы + флаги
-# - P297 = ISO 3166-1 код (только реальные государства)
+# Запрос: суверенные государства + столицы + флаги
+# - Q3624078 = sovereign state; wdt:P279* = подклассы (исключает зависимые территории)
+# - P297 = ISO 3166-1 код (исключает микронации без ISO)
 # - P576 = дата роспуска (исключаем исторические государства)
 # - P36 = столица
 # - P41 = флаг страны / флаг столицы
@@ -30,6 +31,7 @@ SPARQL_ENDPOINT = "https://query.wikidata.org/sparql"
 SPARQL_QUERY = """
 SELECT DISTINCT
   ?country
+  ?isoCode
   ?countryLabel
   ?capitalLabel
   ?countryFlag
@@ -39,14 +41,16 @@ SELECT DISTINCT
   ?capitalArea
   ?capitalAreaUnit
   ?tzLabel
+  ?unMember
 WHERE {
-  # Только страны с ISO 3166-1 кодом (реальные государства)
+  # Только суверенные государства (Q3624078 и подклассы) с ISO-кодом
+  ?country wdt:P31/wdt:P279* wd:Q3624078 .
   ?country wdt:P297 ?isoCode .
   # Исключаем исторические государства (имеющие дату роспуска P576)
   FILTER NOT EXISTS { ?country wdt:P576 [] }
-  # Исключаем географические объекты (острова и т.п.)
-  FILTER NOT EXISTS { ?country wdt:P31 wd:Q23442 }
   ?country wdt:P36 ?capital .
+  # Помечаем членов ООН (P463 = member of, Q1065 = United Nations)
+  BIND(EXISTS { ?country wdt:P463 wd:Q1065 } AS ?unMember)
 
   OPTIONAL { ?country wdt:P41 ?countryFlag . }
   OPTIONAL { ?capital wdt:P41 ?capitalFlag . }
@@ -131,9 +135,13 @@ def fetch_wikidata(query: str, limit: int | None = None) -> list[dict]:
             density = ""
 
         timezone = b.get("tzLabel", {}).get("value", "")
+        iso_code = b.get("isoCode", {}).get("value", "")
+        un_member = b.get("unMember", {}).get("value", "false")
 
         rows.append({
             "wikidata_id":        wikidata_id,
+            "iso_code":           iso_code,
+            "un_member":          un_member,
             "country":            b.get("countryLabel", {}).get("value", ""),
             "capital":            b.get("capitalLabel", {}).get("value", ""),
             "country_flag_url":   country_flag,
@@ -203,21 +211,14 @@ def main():
                 row.update(patch)
                 print(f"  override: {row['country']} ({row['wikidata_id']})", file=sys.stderr)
 
-    # Сохраняем *_flag_file из предыдущего CSV, чтобы не потерять кэш флагов
-    existing_flags: dict[str, dict] = {}
-    if output_path.exists():
-        with output_path.open(encoding="utf-8", newline="") as f:
-            for r in csv.DictReader(f):
-                existing_flags[r["wikidata_id"]] = {
-                    "country_flag_file": r.get("country_flag_file", ""),
-                    "capital_flag_file": r.get("capital_flag_file", ""),
-                }
-    for row in rows:
-        prev = existing_flags.get(row["wikidata_id"], {})
-        row.setdefault("country_flag_file", prev.get("country_flag_file", ""))
-        row.setdefault("capital_flag_file", prev.get("capital_flag_file", ""))
+    # Исключаем строки с exclude: true
+    before = len(rows)
+    rows = [r for r in rows if not r.get("exclude")]
+    excluded = before - len(rows)
+    if excluded:
+        print(f"  исключено через overrides: {excluded}", file=sys.stderr)
 
-    fieldnames = ["wikidata_id", "country", "capital", "country_flag_url", "country_flag_file", "capital_flag_url", "capital_flag_file", "capital_population", "capital_area", "capital_density", "capital_timezone"]
+    fieldnames = ["wikidata_id", "iso_code", "un_member", "country", "capital", "country_flag_url", "capital_flag_url", "capital_population", "capital_area", "capital_density", "capital_timezone"]
     with output_path.open("w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()

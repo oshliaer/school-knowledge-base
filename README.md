@@ -2,7 +2,7 @@
 
 Конвертация Markdown-карточек в колоды Anki (.apkg).
 
-**Версия:** 1.2.0 | [Релизы](https://github.com/oshliaer/school-knowledge-base/releases)
+**Версия:** 1.3.0 | [Релизы](https://github.com/oshliaer/school-knowledge-base/releases)
 
 ## Быстрый старт
 
@@ -109,7 +109,7 @@ hr {
 | `python scripts/md2anki.py "Название темы"` | Собрать одну Markdown-колоду |
 | `python scripts/md2anki.py --output dist/` | Указать выходную директорию |
 | `python scripts/fetch_countries.py` | Обновить данные стран из Wikidata → `countries.csv` |
-| `python scripts/fetch_flags.py` | Скачать флаги и обновить `countries.csv` именами файлов |
+| `python scripts/fetch_flags.py` | Скачать флаги и обновить `flags.csv` (отдельный cache) |
 | `python scripts/csv2anki.py` | Собрать CSV-колоды (напр. География мира) |
 
 ## Требования

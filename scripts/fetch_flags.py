@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Download missing flags from countries.csv into the flags/ cache.
-After downloading, writes cached filenames back into the CSV.
+Writes flag filenames into flags.csv (separate from countries.csv).
 
 Usage:
     python scripts/fetch_flags.py
@@ -21,17 +21,15 @@ from pathlib import Path
 from PIL import Image
 
 
-FIELDNAMES = [
-    "wikidata_id", "country", "capital",
-    "country_flag_url", "country_flag_file",
-    "capital_flag_url", "capital_flag_file",
-    "capital_population", "capital_area", "capital_density", "capital_timezone",
-]
+FLAGS_FIELDNAMES = ["wikidata_id", "country_flag_file", "capital_flag_file"]
 
 
-def resolve_cached(url: str, cache_dir: Path) -> str | None:
-    """Return cached filename if exists and within size limit, else None.
-    Oversized SVGs are treated as not cached so they get re-downloaded as PNG."""
+OVERSIZED = object()  # sentinel: SVG есть в кэше, но слишком большой
+
+
+def resolve_cached(url: str, cache_dir: Path) -> str | None | object:
+    """Return cached filename, OVERSIZED sentinel, or None.
+    OVERSIZED означает: SVG есть локально, но превышает MAX_FLAG_SIZE — нужно скачать PNG."""
     if not url:
         return None
     hash_ = hashlib.md5(url.encode()).hexdigest()[:12]
@@ -39,12 +37,12 @@ def resolve_cached(url: str, cache_dir: Path) -> str | None:
         fpath = cache_dir / f"{hash_}.{ext}"
         if fpath.exists():
             if ext == "svg" and fpath.stat().st_size > MAX_FLAG_SIZE:
-                return None  # перекачать как PNG
+                return OVERSIZED
             return f"{hash_}.{ext}"
     return None
 
 
-MAX_FLAG_SIZE = 350 * 1024  # 350 КБ — геральдические SVG могут весить десятки МБ
+MAX_FLAG_SIZE = 100 * 1024  # 100 КБ — геральдические SVG могут весить десятки МБ
 PNG_FALLBACK_WIDTH = 300    # ширина PNG-рендера при fallback (карточки отображают флаги 150px высотой)
 MAX_RASTER_HEIGHT = 300     # макс. высота PNG/JPEG (2x retina; CSS показывает 150px)
 
@@ -86,19 +84,20 @@ def _png_fallback_url(svg_url: str) -> str:
     return f"{svg_url}{'&' if '?' in svg_url else '?'}width={PNG_FALLBACK_WIDTH}"
 
 
-def download_flag(url: str, cache_dir: Path) -> str:
+def download_flag(url: str, cache_dir: Path, key_url: str | None = None) -> str:
     """Download flag to cache, return filename. Extension determined from Content-Type.
-    If SVG exceeds MAX_FLAG_SIZE, falls back to PNG render from Wikimedia. Raises on failure."""
+    If SVG exceeds MAX_FLAG_SIZE, falls back to PNG render from Wikimedia. Raises on failure.
+    key_url: URL для вычисления имени файла (по умолчанию = url)."""
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme not in {"http", "https"}:
         raise RuntimeError(f"Неподдерживаемая схема URL: {url}")
-    hash_ = hashlib.md5(url.encode()).hexdigest()[:12]
+    hash_ = hashlib.md5((key_url or url).encode()).hexdigest()[:12]
     for attempt in range(5):
         try:
             data, ext = _fetch_url(url)
             if ext == "svg" and len(data) > MAX_FLAG_SIZE:
                 svg_kb = len(data) // 1024
-                data, ext = _fetch_url(_png_fallback_url(url))
+                data, ext = _fetch_url(_png_fallback_url(key_url or url))
                 print(f"    SVG слишком большой ({svg_kb} КБ → PNG {PNG_FALLBACK_WIDTH}px, {len(data) // 1024} КБ)", file=sys.stderr)
             if ext in ("png", "jpg"):
                 data = resize_raster(data, ext)
@@ -114,7 +113,7 @@ def download_flag(url: str, cache_dir: Path) -> str:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Download missing flags, update CSV with filenames")
+    parser = argparse.ArgumentParser(description="Download missing flags, write flags.csv")
     parser.add_argument("--input", "-i", default="География мира/countries.csv")
     def positive_int(value: str) -> int:
         ivalue = int(value)
@@ -128,73 +127,104 @@ def main():
 
     repo_root = Path(__file__).parent.parent
     csv_path = repo_root / args.input
+    flags_path = csv_path.parent / "flags.csv"
     cache_dir = csv_path.parent / "flags"
     cache_dir.mkdir(exist_ok=True)
 
     with csv_path.open(encoding="utf-8", newline="") as f:
         rows = list(csv.DictReader(f))
 
+    # Загружаем существующий flags.csv чтобы сохранить кэш
+    existing: dict[str, dict] = {}
+    if flags_path.exists():
+        with flags_path.open(encoding="utf-8", newline="") as f:
+            for r in csv.DictReader(f):
+                existing[r["wikidata_id"]] = r
+
+    # Строим записи флагов
+    flag_rows: list[dict] = []
     downloaded = 0
     skipped = 0
     limited = 0
 
-    for row in rows:
+    for i, row in enumerate(rows, 1):
+        wikidata_id = row.get("wikidata_id", "").strip()
+        country = row.get("country", wikidata_id)
+        flag_row = {"wikidata_id": wikidata_id, "country_flag_file": "", "capital_flag_file": ""}
+
+        # Берём сохранённые значения из предыдущего flags.csv
+        prev = existing.get(wikidata_id, {})
+        flag_row["country_flag_file"] = prev.get("country_flag_file", "")
+        flag_row["capital_flag_file"] = prev.get("capital_flag_file", "")
+
         for url_field, file_field in (
             ("country_flag_url", "country_flag_file"),
             ("capital_flag_url", "capital_flag_file"),
         ):
             url = row.get(url_field, "").strip()
+            label = "флаг страны" if url_field == "country_flag_url" else "флаг столицы"
             if not url:
-                row[file_field] = ""
+                flag_row[file_field] = ""
                 continue
 
             cached = resolve_cached(url, cache_dir)
             old_png_to_remove = None
-            if cached:
+
+            if cached is OVERSIZED:
+                # SVG уже есть локально и слишком большой — качаем PNG напрямую
+                hash_ = hashlib.md5(url.encode()).hexdigest()[:12]
+                svg_kb = (cache_dir / f"{hash_}.svg").stat().st_size // 1024
+                print(f"  [{i}/{len(rows)}] {country}: {label} — SVG {svg_kb} КБ > {MAX_FLAG_SIZE // 1024} КБ, скачиваем PNG", file=sys.stderr)
+                fetch_url = _png_fallback_url(url)
+            elif cached:
                 if args.replace_png and cached.endswith(".png"):
-                    # Удаляем PNG только если лимит позволяет скачать SVG
                     if args.limit is not None and downloaded >= args.limit:
-                        row[file_field] = cached
+                        flag_row[file_field] = cached
                         skipped += 1
                         continue
+                    print(f"  [{i}/{len(rows)}] {country}: {label} — заменяем PNG→SVG", file=sys.stderr)
                     old_png_to_remove = cache_dir / cached
                 else:
-                    row[file_field] = cached
                     skipped += 1
+                    flag_row[file_field] = cached
                     continue
+                fetch_url = url
+            else:
+                print(f"  [{i}/{len(rows)}] {country}: {label} — скачиваем", file=sys.stderr)
+                fetch_url = url
 
             if args.limit is not None and downloaded >= args.limit:
-                # Не затираем уже закэшированное значение
-                if not row.get(file_field):
-                    row[file_field] = ""
                 limited += 1
                 continue
 
             try:
-                fname = download_flag(url, cache_dir)
-                # Удаляем старый PNG только после успешной загрузки
+                key_url = url if fetch_url != url else None
+                fname = download_flag(fetch_url, cache_dir, key_url=key_url)
                 if old_png_to_remove and old_png_to_remove.exists():
                     old_png_to_remove.unlink()
-                row[file_field] = fname
-                print(f"  ✓ {fname}  {url.split('/')[-1]}")
+                flag_row[file_field] = fname
+                size_kb = (cache_dir / fname).stat().st_size // 1024
+                print(f"  [{i}/{len(rows)}] {country}: {label} — ✓ {fname} ({size_kb} КБ)")
                 downloaded += 1
                 time.sleep(0.5)
             except RuntimeError as e:
-                print(f"  ✗ {e}", file=sys.stderr)
+                print(f"  [{i}/{len(rows)}] {country}: {label} — ✗ {e}", file=sys.stderr)
                 sys.exit(1)
 
-    # Записываем обновлённый CSV с именами файлов
-    with csv_path.open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=FIELDNAMES, extrasaction="ignore")
-        writer.writeheader()
-        writer.writerows(rows)
+        flag_rows.append(flag_row)
 
-    # Удаляем флаги, которые не упоминаются в CSV (orphan-файлы)
+    # Записываем flags.csv
+    with flags_path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=FLAGS_FIELDNAMES)
+        writer.writeheader()
+        writer.writerows(flag_rows)
+
+    # Удаляем флаги, которые не упоминаются в flags.csv (orphan-файлы)
     referenced = {
-        row[f]
-        for row in rows
+        r[f]
+        for r in flag_rows
         for f in ("country_flag_file", "capital_flag_file")
-        if row.get(f)
+        if r.get(f)
     }
     removed = 0
     for fpath in cache_dir.iterdir():
@@ -202,11 +232,11 @@ def main():
             continue
         if fpath.name not in referenced:
             fpath.unlink()
-            print(f"  🗑 удалён orphan: {fpath.name}", file=sys.stderr)
+            print(f"  удалён orphan: {fpath.name}", file=sys.stderr)
             removed += 1
 
     print(f"\nСкачано: {downloaded}, в кэше: {skipped}, лимит исчерпан: {limited}, удалено orphan: {removed}", file=sys.stderr)
-    print(f"CSV обновлён: {csv_path}", file=sys.stderr)
+    print(f"flags.csv обновлён: {flags_path}", file=sys.stderr)
 
 
 if __name__ == "__main__":

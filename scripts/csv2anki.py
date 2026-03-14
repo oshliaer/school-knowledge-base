@@ -96,6 +96,20 @@ def build_deck(csv_path: Path, output_dir: Path, deck_config: dict, args=None) -
         reader = csv.DictReader(f)
         rows = list(reader)
 
+    # Подгружаем flags.csv и мёрджим по wikidata_id
+    flags_path = csv_path.parent / "flags.csv"
+    if flags_path.exists():
+        with flags_path.open(encoding="utf-8", newline="") as f:
+            flags_index = {r["wikidata_id"]: r for r in csv.DictReader(f)}
+        for row in rows:
+            flag_data = flags_index.get(row.get("wikidata_id", ""), {})
+            row["country_flag_file"] = flag_data.get("country_flag_file", "")
+            row["capital_flag_file"] = flag_data.get("capital_flag_file", "")
+    else:
+        for row in rows:
+            row.setdefault("country_flag_file", "")
+            row.setdefault("capital_flag_file", "")
+
     print(f"  Загружено {len(rows)} стран из {csv_path.name}")
 
     for i, row in enumerate(rows, 1):

@@ -1,3 +1,28 @@
+## [1.3.0] — 2026-03-14
+
+### Добавлено
+- `scripts/fetch_flags.py`: новый файл `flags.csv` (отдельный cache) — хранит связь `wikidata_id → country_flag_file, capital_flag_file`
+- `scripts/fetch_flags.py`: sentinel `OVERSIZED` — если SVG уже в кэше и больше `MAX_FLAG_SIZE`, PNG скачивается напрямую без повторной загрузки SVG
+- `scripts/fetch_flags.py`: параметр `key_url` в `download_flag()` — имя файла считается от оригинального URL даже при скачивании PNG fallback
+- `scripts/csv2anki.py`: join с `flags.csv` по `wikidata_id` при сборке колоды
+- `География мира/overrides.yaml`: документация поля `exclude: true` для исключения несуверенных территорий
+
+### Изменено
+- `scripts/fetch_countries.py`: переработан SPARQL-запрос — заменён фильтр `P297` (ISO-код) на `wdt:P31/wdt:P279* wd:Q3624078` (суверенное государство) + `P297`. Исключает зависимые территории, оставляет де-факто государства (Тайвань, Палестина)
+- `scripts/fetch_countries.py`: добавлены колонки `iso_code` (ISO 3166-1) и `un_member` (boolean)
+- `scripts/fetch_countries.py`: удалены колонки `country_flag_file` и `capital_flag_file` из выходного CSV (перенесены в `flags.csv`)
+- `scripts/fetch_flags.py`: теперь пишет в отдельный `flags.csv` вместо обновления `countries.csv`
+- `scripts/fetch_flags.py`: `MAX_FLAG_SIZE` снижена до 100 КБ (было 350 КБ)
+- `scripts/fetch_flags.py`: улучшено логирование — показывает размер SVG до и после resizing
+- `География мира/countries.csv`: обновлён для новой архитектуры — 195 суверенных государств (было 239), новые колонки `iso_code`/`un_member`, удалены `*_flag_file`
+- `География мира/overrides.yaml`: добавлены записи `Q35` (Дания): `un_member: true` (исправление Wikidata) и `Q1410` (Гибралтар): `exclude: true` (ошибочно классифицирован как суверенное государство)
+
+### Удалено
+- Флаги больше не встроены в `countries.csv` — перемещены в отдельный кэш `flags.csv`
+
+### Закрыто
+- GitHub #13: несуверенные территории в колоде География мира
+
 ## [1.2.0] — 2026-03-14
 
 ### Добавлено
