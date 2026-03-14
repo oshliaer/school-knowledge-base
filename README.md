@@ -1,122 +1,24 @@
-# School Knowledge Base
+# Учебные карточки для школьников
 
-Конвертация Markdown-карточек в колоды Anki (.apkg).
+Готовые карточки для [Anki](https://apps.ankiweb.net/) по школьным предметам — учи по 10 минут в день и запоминай надолго.
 
-**Версия:** 1.3.1 | [Релизы](https://github.com/oshliaer/school-knowledge-base/releases)
+## Что есть
 
-## Быстрый старт
+| Предмет | Что внутри |
+|---------|------------|
+| Вероятность и статистика 7–9 | Понятия, определения, формулы из учебника |
+| География мира | Все страны — столицы и флаги |
 
-```bash
-# Установка зависимостей
-pip install -r requirements.txt
+## Как начать
 
-# Сборка всех колод
-python scripts/md2anki.py
+1. Установи [Anki](https://apps.ankiweb.net/) — бесплатно для телефона и компьютера
+2. Скачай нужную колоду со страницы [релизов](https://github.com/oshliaer/school-knowledge-base/releases) (файл `.apkg`)
+3. Открой файл — Anki сам добавит карточки
 
-# Сборка конкретной темы
-python scripts/md2anki.py "Вероятность и статистика 7-9"
-```
+## Нашёл ошибку или хочешь новый предмет?
 
-## Структура проекта
-
-```
-.
-├── scripts/
-│   └── md2anki.py          # Скрипт конвертации
-├── <Предмет>/
-│   ├── deck.yaml           # Конфигурация колоды (name, id)
-│   ├── styles.css          # Стили карточек (опционально)
-│   └── decks/
-│       ├── 00-тема.md      # Карточки напрямую в .md файлах
-│       └── 01-тема.md
-└── dist/                   # Выходные .apkg файлы
-```
-
-## Формат карточек
-
-Файл карточек начинается с YAML frontmatter (опционально):
-
-```markdown
----
-type: basic          # basic | basic-reversed | cloze
-tags: [тег1, тег2]   # теги по умолчанию для файла
----
-
-## Вопрос / лицевая сторона
-
-^^^
-
-Текст ответа / обратная сторона.
+[Напиши нам](https://github.com/oshliaer/school-knowledge-base/issues/new) — исправим или добавим.
 
 ---
 
----
-id: my-card-id       # явный id (обязательно!)
-type: basic-reversed # переопределение типа
-tags: [доп-тег]      # дополнительные теги
----
-
-## Другой вопрос
-
-^^^
-
-Текст ответа.
-```
-
-**Обязательный разделитель `^^^`** отделяет вопрос от ответа только для типов `basic` и `basic-reversed`. Без него карточка пропускается при сборке. Для типа `cloze` этот разделитель не требуется.
-
-### Типы карточек
-
-- `basic` — вопрос/ответ
-- `basic-reversed` — вопрос/ответ + ответ/вопрос (двусторонняя)
-- `cloze` — карточка с закрытым текстом `{{c1::...}}`
-
-## Стили карточек
-
-Папка предмета может содержать файл `styles.css` для управления внешним видом карточек. Скрипт автоматически подбирает стили по названию папки предмета.
-
-Пример `styles.css`:
-
-```css
-.card {
-  font-family: 'Open Sans', sans-serif;
-  font-size: 20px;
-  line-height: 1.6;
-}
-
-table {
-  border-collapse: collapse;
-  margin: 1em 0;
-}
-
-table td, table th {
-  border: 1px solid #ccc;
-  padding: 0.5em;
-}
-
-hr {
-  border: none;
-  border-top: 2px solid #999;
-  margin: 1em 0;
-}
-```
-
-## Скрипты и команды
-
-| Команда | Описание |
-|---------|----------|
-| `python scripts/md2anki.py` | Собрать все Markdown-колоды |
-| `python scripts/md2anki.py "Название темы"` | Собрать одну Markdown-колоду |
-| `python scripts/md2anki.py --output dist/` | Указать выходную директорию |
-| `python scripts/fetch_countries.py` | Обновить данные стран из Wikidata → `countries.csv` |
-| `python scripts/fetch_flags.py` | Скачать флаги и обновить `flags.csv` (отдельный cache) |
-| `python scripts/csv2anki.py` | Собрать CSV-колоды (напр. География мира) |
-
-## Требования
-
-- Python 3.11+
-- Зависимости: `genanki`, `markdown`, `PyYAML`, `python-slugify`, `Pillow`
-
-## CI/CD
-
-GitHub Actions автоматически собирает колоды при пуше в ветку `master` и создаёт релиз по тегу `v*`. После успешной сборки при пуше тега отправляется уведомление в Telegram (через reusable workflow `notify-telegram.yml`).
+Для учителей — [отдельная страница](docs/FOR_TEACHERS.md).
