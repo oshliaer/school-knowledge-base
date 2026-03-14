@@ -390,7 +390,7 @@ def main():
         try:
             result = build_subject(subject_dir, output_dir)
             if result is None:
-                print(f"  Skipped (no decks/ directory — CSV or other pipeline)")
+                print("  Skipped (no decks/ directory — CSV or other pipeline)")
         except Exception as e:
             print(f"FAILED: {e}", file=sys.stderr)
             sys.exit(1)
