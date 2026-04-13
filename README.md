@@ -11,7 +11,7 @@
 
 ## Как начать
 
-1. Установи [Anki](https://apps.ankiweb.net/) — бесплатно для телефона и компьютера
+1. Установи [Anki](https://apps.ankiweb.net/) — бесплатно для компьютера и Android (AnkiDroid), для iPhone/iPad AnkiMobile платный
 2. Скачай нужную колоду со страницы [релизов](https://github.com/oshliaer/school-knowledge-base/releases) (файл `.apkg`)
 3. Открой файл — Anki сам добавит карточки
 

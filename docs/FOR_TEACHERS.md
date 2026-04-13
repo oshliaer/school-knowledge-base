@@ -11,7 +11,7 @@
 
 ## Как использовать с классом
 
-1. Попросите учеников установить [Anki](https://apps.ankiweb.net/) — бесплатно, есть для Android, iOS и компьютера
+1. Попросите учеников установить [Anki](https://apps.ankiweb.net/) — бесплатно на компьютере и Android (AnkiDroid); для iPhone/iPad AnkiMobile платный
 2. Поделитесь ссылкой на [страницу релизов](https://github.com/oshliaer/school-knowledge-base/releases)
 3. Ученики скачивают `.apkg`-файл нужной колоды и открывают его в Anki
 
