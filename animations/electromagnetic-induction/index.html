@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1976d2">
+<title>Электромагнитная индукция — опыт с катушками К1 и К2</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 12px; background: #f5f5f5; color: #222; -webkit-text-size-adjust: 100%; }
+  h1 { font-size: 17px; margin: 0 0 12px; line-height: 1.3; }
+  .wrap { max-width: 900px; margin: 0 auto; background: #fff; padding: 12px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+  svg { width: 100%; height: auto; aspect-ratio: 900 / 490; background: #fafafa; border: 1px solid #ddd; border-radius: 4px; display: block; touch-action: manipulation; }
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 12px; }
+  .ctrl { border: 1px solid #ddd; padding: 10px; border-radius: 4px; background: #fcfcfc; }
+  .ctrl label { display: block; font-size: 13px; margin-bottom: 6px; color: #555; }
+  .ctrl input[type=range] { width: 100%; height: 32px; accent-color: #1976d2; }
+  .ctrl button { width: 100%; padding: 12px; font-size: 15px; cursor: pointer; border: 1px solid #888; background: #fff; border-radius: 4px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .ctrl button.on { background: #4caf50; color: #fff; border-color: #388e3c; }
+  .val { font-weight: bold; color: #1976d2; }
+  .info { margin-top: 12px; padding: 10px; background: #fff8e1; border-left: 4px solid #ffa000; font-size: 14px; border-radius: 4px; }
+  .info b { color: #e65100; }
+  @media (max-width: 480px) {
+    body { padding: 8px; }
+    h1 { font-size: 15px; }
+    .wrap { padding: 10px; }
+    .controls { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .info { font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Опыт с катушками К1 и К2: когда в К2 возникает индукционный ток?</h1>
+
+  <svg viewBox="0 -70 900 490" xmlns="http://www.w3.org/2000/svg">
+    <!-- Цепь К1: источник, реостат, ключ, катушка К1 -->
+    <!-- провода -->
+    <path id="wireK1" d="M 80 320 L 80 380 L 500 380 L 500 320 M 80 260 L 80 200 L 200 200 M 300 200 L 400 200 M 500 260 L 500 200 L 400 200" stroke="#333" stroke-width="2" fill="none"/>
+
+    <!-- Батарея -->
+    <g transform="translate(80,290)">
+      <line x1="-15" y1="-10" x2="15" y2="-10" stroke="#333" stroke-width="3"/>
+      <line x1="-8" y1="10" x2="8" y2="10" stroke="#333" stroke-width="3"/>
+      <text x="0" y="34" text-anchor="middle" font-size="12">ε</text>
+    </g>
+
+    <!-- Реостат (ползунок перетаскивается) -->
+    <g id="rheoGroup" transform="translate(250,200)" style="cursor:ew-resize;touch-action:none">
+      <rect x="-60" y="-40" width="120" height="55" fill="transparent"/>
+      <rect x="-50" y="-10" width="100" height="20" fill="#fff" stroke="#333"/>
+      <line id="rheoSlider" x1="0" y1="-20" x2="0" y2="-10" stroke="#333" stroke-width="2"/>
+      <polygon id="rheoArrow" points="-5,-25 5,-25 0,-20" fill="#333"/>
+      <text x="0" y="-38" text-anchor="middle" font-size="20" font-weight="bold">Р</text>
+    </g>
+
+    <!-- Ключ (кликабельный) -->
+    <g id="keyGroup" transform="translate(450,200)" style="cursor:pointer">
+      <rect x="-40" y="-30" width="80" height="55" fill="transparent"/>
+      <circle cx="-25" cy="0" r="3" fill="#333"/>
+      <circle cx="25" cy="0" r="3" fill="#333"/>
+      <line id="keyLine" x1="-25" y1="0" x2="20" y2="-15" stroke="#333" stroke-width="2"/>
+      <text x="0" y="30" text-anchor="middle" font-size="18" font-weight="bold">К</text>
+      <text x="0" y="44" text-anchor="middle" font-size="10" fill="#666">(нажми)</text>
+    </g>
+
+    <!-- Катушка К1 -->
+    <g id="coilK1" transform="translate(500,290)" style="cursor:ns-resize;touch-action:none">
+      <rect x="-45" y="-45" width="90" height="110" fill="transparent"/>
+      <rect x="-30" y="-30" width="60" height="60" fill="#e3f2fd" stroke="#1976d2" stroke-width="2"/>
+      <g id="coilK1Turns"></g>
+      <text x="0" y="50" text-anchor="middle" font-size="20" font-weight="bold">К1</text>
+    </g>
+
+    <!-- Магнитное поле (линии) -->
+    <g id="field" opacity="0"></g>
+
+    <!-- Катушка К2 (движется) -->
+    <g id="coilK2" transform="translate(720,290)" style="cursor:grab;touch-action:none">
+      <rect x="-45" y="-45" width="90" height="110" fill="transparent"/>
+      <rect x="-30" y="-30" width="60" height="60" fill="#fce4ec" stroke="#c2185b" stroke-width="2"/>
+      <g id="coilK2Turns"></g>
+      <text x="0" y="50" text-anchor="middle" font-size="20" font-weight="bold">К2</text>
+      <!-- Табло: последнее пиковое показание -->
+      <g transform="translate(0,-305)">
+        <rect id="peakPanel" x="-90" y="-28" width="180" height="44" rx="6" fill="#0d1b2a" stroke="#333" stroke-width="2" style="cursor:pointer"/>
+        <text x="-82" y="-10" font-size="10" fill="#78909c" style="pointer-events:none">ПИК ЭДС</text>
+        <text id="peakVal" x="0" y="10" text-anchor="middle" font-size="26" font-weight="bold" font-family="monospace" fill="#4caf50" style="pointer-events:none">0.00</text>
+        <text x="82" y="-14" text-anchor="end" font-size="9" fill="#78909c" style="pointer-events:none">⟲ сброс</text>
+      </g>
+      <!-- Гальванометр -->
+      <g transform="translate(0,-170)">
+        <circle cx="0" cy="0" r="85" fill="#fff" stroke="#333" stroke-width="3"/>
+        <!-- шкала -->
+        <path d="M -72 0 A 72 72 0 0 1 72 0" fill="none" stroke="#bbb" stroke-width="1.5"/>
+        <g stroke="#555" stroke-width="1.5">
+          <line x1="-72" y1="0" x2="-82" y2="0"/>
+          <line x1="-51" y1="-51" x2="-58" y2="-58"/>
+          <line x1="0" y1="-72" x2="0" y2="-82"/>
+          <line x1="51" y1="-51" x2="58" y2="-58"/>
+          <line x1="72" y1="0" x2="82" y2="0"/>
+        </g>
+        <text x="-82" y="20" text-anchor="middle" font-size="18" font-weight="bold" fill="#c2185b">−</text>
+        <text x="0" y="-90" text-anchor="middle" font-size="16" fill="#555">0</text>
+        <text x="82" y="20" text-anchor="middle" font-size="18" font-weight="bold" fill="#1976d2">+</text>
+        <!-- стрелка -->
+        <g id="galvoNeedle">
+          <polygon points="0,10 -5,-65 0,-78 5,-65" fill="#d32f2f" stroke="#900" stroke-width="1.2"/>
+        </g>
+        <circle cx="0" cy="0" r="8" fill="#333"/>
+        <text x="0" y="60" text-anchor="middle" font-size="20" font-weight="bold" fill="#333">G</text>
+      </g>
+      <line x1="-15" y1="-30" x2="-15" y2="-90" stroke="#333" stroke-width="1.5"/>
+      <line x1="15" y1="-30" x2="15" y2="-90" stroke="#333" stroke-width="1.5"/>
+    </g>
+
+    <!-- Индикатор тока К1 -->
+    <circle id="currentDot" cx="0" cy="0" r="4" fill="#ff9800" opacity="0"/>
+  </svg>
+
+  <div class="info" style="background:#e3f2fd;border-left-color:#1976d2;margin-top:12px">
+    Положение К2: <b><span id="posVal">110</span> мм</b> &nbsp;|&nbsp;
+    R: <b><span id="rVal">5</span> Ом</b> &nbsp;|&nbsp;
+    витки К1/К2: <b><span id="n1Val">6</span>/<span id="n2Val">6</span></b>
+  </div>
+
+  <div class="info">
+    Ток в К1: <b id="iVal">0</b> (усл. ед.) &nbsp;|&nbsp;
+    Магнитный поток через К2: <b id="fluxVal">0</b> &nbsp;|&nbsp;
+    ЭДС индукции в К2: <b id="emfVal">0</b>
+    <div style="margin-top:6px;font-size:13px;color:#555">
+      ЭДС возникает только при <b>изменении</b> потока. Попробуй: тащи К2 вбок/вверх-вниз (положение и витки), К1 вверх-вниз (витки), ползунок реостата, щёлкни ключ.
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let state = {
+  keyOn: false,
+  pos: 220,
+  R: 5,
+  n1: 6,
+  n2: 6,
+  prevFlux: 0,
+  emf: 0,
+  needleAngle: 0,
+  peak: 0,           // последнее зафиксированное пиковое значение
+  currentPeak: 0,    // пик в рамках текущего всплеска
+  measuring: false,  // идёт ли сейчас всплеск
+};
+
+// Отрисовка витков катушек
+function drawTurns(groupId, n, color) {
+  const g = $(groupId);
+  g.innerHTML = '';
+  const step = 50 / (n + 1);
+  for (let i = 1; i <= n; i++) {
+    const y = -25 + i * step;
+    const el = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    el.setAttribute('x1', -25); el.setAttribute('x2', 25);
+    el.setAttribute('y1', y); el.setAttribute('y2', y);
+    el.setAttribute('stroke', color); el.setAttribute('stroke-width', 1.5);
+    g.appendChild(el);
+  }
+}
+
+// Линии магнитного поля от К1
+function drawField(strength) {
+  const g = $('field');
+  g.innerHTML = '';
+  if (strength <= 0.01) { g.setAttribute('opacity', 0); return; }
+  g.setAttribute('opacity', Math.min(1, strength));
+  // эллиптические линии вокруг К1 (центр 500,290)
+  const cx = 500, cy = 290;
+  const lines = 5;
+  for (let i = 1; i <= lines; i++) {
+    const rx = 40 + i * 25;
+    const ry = 25 + i * 10;
+    const el = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+    el.setAttribute('cx', cx); el.setAttribute('cy', cy);
+    el.setAttribute('rx', rx); el.setAttribute('ry', ry);
+    el.setAttribute('fill', 'none');
+    el.setAttribute('stroke', '#1976d2');
+    el.setAttribute('stroke-width', 1);
+    el.setAttribute('stroke-dasharray', '4 3');
+    g.appendChild(el);
+  }
+}
+
+function computeCurrent() {
+  if (!state.keyOn) return 0;
+  // I = ε / (R + r), ε=10 усл, r=1
+  return 10 / (state.R + 1);
+}
+
+function computeFlux() {
+  const I = computeCurrent();
+  // Поток через К2 ~ I * n1 * n2 / distance^2
+  const dist = state.pos; // от центра К1 (500) до К2
+  const d = Math.max(60, dist - 60); // расстояние между центрами катушек (К2 в 500+pos)
+  return (I * state.n1 * state.n2) / (d * d) * 1000;
+}
+
+function update() {
+  // позиция К2
+  $('coilK2').setAttribute('transform', `translate(${500 + state.pos},290)`);
+  $('posVal').textContent = Math.round(state.pos / 2);
+  $('rVal').textContent = state.R;
+  $('n1Val').textContent = state.n1;
+  $('n2Val').textContent = state.n2;
+
+  // ключ на схеме
+  $('keyLine').setAttribute('x2', state.keyOn ? 25 : 20);
+  $('keyLine').setAttribute('y2', state.keyOn ? 0 : -15);
+
+  // реостат — сдвиг ползунка
+  const rx = -50 + (state.R - 1) / 19 * 100;
+  $('rheoSlider').setAttribute('x1', rx);
+  $('rheoSlider').setAttribute('x2', rx);
+  $('rheoArrow').setAttribute('transform', `translate(${rx},0)`);
+
+  // витки
+  drawTurns('coilK1Turns', state.n1, '#1976d2');
+  drawTurns('coilK2Turns', state.n2, '#c2185b');
+
+  const I = computeCurrent();
+  const flux = computeFlux();
+  drawField(I / 10);
+
+  $('iVal').textContent = I.toFixed(2);
+  $('fluxVal').textContent = flux.toFixed(2);
+}
+
+// Цикл: считаем ЭДС как разницу потока
+let lastT = performance.now();
+function tick(t) {
+  const dt = (t - lastT) / 1000;
+  lastT = t;
+  const flux = computeFlux();
+  const dFlux = flux - state.prevFlux;
+  state.prevFlux = flux;
+  // ЭДС ~ -dФ/dt * n2
+  const rawEmf = -dFlux / Math.max(dt, 0.001) * state.n2 * 0.01;
+  // экспоненциальное затухание к нулю для плавности
+  state.emf = state.emf * 0.85 + rawEmf * 0.15;
+  if (Math.abs(state.emf) < 0.01) state.emf = 0;
+  $('emfVal').textContent = state.emf.toFixed(2);
+
+  // Peak hold: отслеживаем всплеск и фиксируем максимум по модулю
+  const thrOn = 0.08, thrOff = 0.04;
+  if (!state.measuring && Math.abs(state.emf) > thrOn) {
+    state.measuring = true;
+    state.currentPeak = state.emf;
+  } else if (state.measuring) {
+    if (Math.abs(state.emf) > Math.abs(state.currentPeak)) state.currentPeak = state.emf;
+    if (Math.abs(state.emf) < thrOff) {
+      state.peak = state.currentPeak;
+      state.measuring = false;
+      state.currentPeak = 0;
+    }
+  }
+  const shown = state.measuring ? state.currentPeak : state.peak;
+  const peakEl = $('peakVal');
+  peakEl.textContent = (shown >= 0 ? '+' : '') + shown.toFixed(2);
+  peakEl.setAttribute('fill', state.measuring ? '#ffeb3b' : (shown === 0 ? '#4caf50' : '#4caf50'));
+  // стрелка гальванометра
+  const target = Math.max(-60, Math.min(60, state.emf * 15));
+  state.needleAngle += (target - state.needleAngle) * 0.2;
+  $('galvoNeedle').setAttribute('transform', `rotate(${state.needleAngle})`);
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+// События
+$('peakPanel').onclick = () => { state.peak = 0; state.currentPeak = 0; state.measuring = false; };
+$('keyGroup').onclick = () => { state.keyOn = !state.keyOn; update(); };
+// Конвертация клиентских координат в SVG-координаты
+const svgEl = document.querySelector('svg');
+function clientToSvg(clientX, clientY) {
+  const pt = svgEl.createSVGPoint();
+  pt.x = clientX; pt.y = clientY;
+  return pt.matrixTransform(svgEl.getScreenCTM().inverse());
+}
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+function attachDrag(el, onMove) {
+  let active = false, startX = 0, startY = 0, startState = null;
+  el.addEventListener('pointerdown', e => {
+    active = true; el.setPointerCapture(e.pointerId);
+    const p = clientToSvg(e.clientX, e.clientY);
+    startX = p.x; startY = p.y;
+    startState = { pos: state.pos, R: state.R, n1: state.n1, n2: state.n2 };
+    e.preventDefault();
+  });
+  el.addEventListener('pointermove', e => {
+    if (!active) return;
+    const p = clientToSvg(e.clientX, e.clientY);
+    onMove(p.x - startX, p.y - startY, p.x, p.y, startState);
+    update();
+  });
+  const stop = e => { active = false; try { el.releasePointerCapture(e.pointerId); } catch(_){} };
+  el.addEventListener('pointerup', stop);
+  el.addEventListener('pointercancel', stop);
+}
+
+// К2: по горизонтали — положение, по вертикали — витки
+attachDrag($('coilK2'), (dx, dy, _x, _y, s0) => {
+  state.pos = clamp(s0.pos + dx, 80, 320);
+  state.n2 = clamp(Math.round(s0.n2 - dy / 12), 2, 12);
+});
+// К1: только витки (по вертикали)
+attachDrag($('coilK1'), (_dx, dy, _x, _y, s0) => {
+  state.n1 = clamp(Math.round(s0.n1 - dy / 12), 2, 12);
+});
+// Реостат: ползунок по горизонтали (абсолютное положение x в локальных координатах группы)
+attachDrag($('rheoGroup'), (_dx, _dy, x, _y) => {
+  // группа в translate(250,200), ползунок в диапазоне [-50..+50] → R 1..20
+  const localX = clamp(x - 250, -50, 50);
+  state.R = clamp(Math.round(1 + (localX + 50) / 100 * 19), 1, 20);
+});
+
+update();
+</script>
+</body>
+</html>
