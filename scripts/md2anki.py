@@ -86,9 +86,14 @@ def resolve_tts(html: str, lang: str) -> str:
         if not phrase:
             return ""
         url = tts_url(phrase, lang)
+        safe_phrase = html_escape(phrase, quote=True)
+        # Ссылка состоит из одной иконки, поэтому доступное имя задаётся
+        # через aria-label: title для скринридеров ненадёжен. lang сообщает
+        # синтезатору речи, на каком языке читать фразу.
         return (
             f'<a class="tts" href="{html_escape(url, quote=True)}" '
-            f'title="{html_escape(phrase, quote=True)}">&#128266;</a>'
+            f'lang="{html_escape(lang, quote=True)}" '
+            f'title="{safe_phrase}" aria-label="{safe_phrase}">&#128266;</a>'
         )
 
     return _TTS_RE.sub(replace, html)
