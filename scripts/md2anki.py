@@ -11,7 +11,10 @@ import argparse
 import hashlib
 import re
 import sys
+from html import escape as html_escape
+from html import unescape as html_unescape
 from pathlib import Path
+from urllib.parse import quote
 
 import genanki
 import markdown
@@ -51,6 +54,51 @@ def md_to_html(text: str) -> str:
     return _md.convert(text)
 
 
+TTS_LANG_DEFAULT = "en"
+
+_TTS_RE = re.compile(r"\{\{tts:(.+?)\}\}", re.S)
+
+# ^^^ on its own line (surrounded by blank lines) splits a card in two parts:
+# front/back for basic, text/extra for cloze.
+# Tolerates extra spaces around ^^^ and varying blank-line counts.
+_SEP_RE = re.compile(r"\n[ \t]*\n[ \t]*\^\^\^[ \t]*\n[ \t]*\n")
+
+
+def tts_url(phrase: str, lang: str) -> str:
+    """Build a Google Translate TTS URL for a phrase.
+
+    Возвращает именно ссылку — аудио не скачивается и не попадает в .apkg.
+    Anki открывает такую ссылку во внешнем браузере, колода остаётся лёгкой.
+    """
+    # safe="" — в значении query-параметра экранируется всё, включая "/",
+    # иначе фраза вроде "and/or" даст неоднозначный URL
+    return (
+        "https://translate.google.com/translate_tts"
+        f"?ie=UTF-8&client=tw-ob&tl={quote(lang, safe='')}&q={quote(phrase, safe='')}"
+    )
+
+
+def resolve_tts(html: str, lang: str) -> str:
+    """Replace {{tts:фраза}} markers with a link to the pronunciation."""
+
+    def replace(m):
+        phrase = html_unescape(m.group(1)).strip()
+        if not phrase:
+            return ""
+        url = tts_url(phrase, lang)
+        safe_phrase = html_escape(phrase, quote=True)
+        # Ссылка состоит из одной иконки, поэтому доступное имя задаётся
+        # через aria-label: title для скринридеров ненадёжен. lang сообщает
+        # синтезатору речи, на каком языке читать фразу.
+        return (
+            f'<a class="tts" href="{html_escape(url, quote=True)}" '
+            f'lang="{html_escape(lang, quote=True)}" '
+            f'title="{safe_phrase}" aria-label="{safe_phrase}">&#128266;</a>'
+        )
+
+    return _TTS_RE.sub(replace, html)
+
+
 def resolve_images(html: str, base_dir: Path, media_map: dict) -> str:
     """Replace local image src paths with flat filenames, collect media files."""
 
@@ -70,7 +118,7 @@ def resolve_images(html: str, base_dir: Path, media_map: dict) -> str:
     return re.sub(r'<img src="([^"]+)"', replace_src, html)
 
 
-def parse_cards(md_file: Path, media_map: dict) -> list[dict]:
+def parse_cards(md_file: Path, media_map: dict, tts_lang: str = TTS_LANG_DEFAULT) -> list[dict]:
     """Parse a markdown card file into a list of card dicts.
 
     File format:
@@ -115,6 +163,8 @@ def parse_cards(md_file: Path, media_map: dict) -> list[dict]:
 
     default_type = meta.get("type", "basic")
     default_tags = [str(t) for t in meta.get("tags", [])]
+    # Язык озвучки: frontmatter файла переопределяет значение из deck.yaml
+    lang = str(meta.get("tts_lang") or tts_lang)
 
     cards = []
     # Split by card separator (--- on its own line between blank lines)
@@ -158,13 +208,29 @@ def parse_cards(md_file: Path, media_map: dict) -> list[dict]:
             card_type = "cloze"
 
         if card_type == "cloze":
-            html = resolve_images(md_to_html(raw), md_file.parent, media_map)
-            cards.append({"type": "cloze", "text": html, "extra": "", "tags": tags, "id": card_id})
+            # Для cloze ^^^ необязателен: то, что после него, попадает в Extra
+            # (перевод, пояснение) и показывается на обратной стороне.
+            sep_match = _SEP_RE.search(raw)
+            if sep_match:
+                text_md, extra_md = raw[:sep_match.start()], raw[sep_match.end():].strip()
+            else:
+                text_md, extra_md = raw, ""
+
+            text_html = resolve_tts(resolve_images(md_to_html(text_md), md_file.parent, media_map), lang)
+            extra_html = (
+                resolve_tts(resolve_images(md_to_html(extra_md), md_file.parent, media_map), lang)
+                if extra_md
+                else ""
+            )
+            cards.append({
+                "type": "cloze",
+                "text": text_html,
+                "extra": extra_html,
+                "tags": tags,
+                "id": card_id,
+            })
         else:
-            # ^^^ on its own line (surrounded by blank lines) splits front and back.
-            # Regex tolerates extra spaces around ^^^ and varying blank-line counts.
-            sep_pattern = r"\n[ \t]*\n[ \t]*\^\^\^[ \t]*\n[ \t]*\n"
-            sep_match = re.search(sep_pattern, raw)
+            sep_match = _SEP_RE.search(raw)
             if not sep_match:
                 front_preview = raw.split('\n', 1)[0][:80]
                 print(f"  WARNING: пропущена карточка без разделителя ^^^: {front_preview}...", file=sys.stderr)
@@ -173,8 +239,8 @@ def parse_cards(md_file: Path, media_map: dict) -> list[dict]:
             front_md = re.sub(r"^#{1,6}\s+", "", front_md.strip())
             back_md = back_md.strip()
 
-            front_html = resolve_images(md_to_html(front_md), md_file.parent, media_map)
-            back_html = resolve_images(md_to_html(back_md), md_file.parent, media_map)
+            front_html = resolve_tts(resolve_images(md_to_html(front_md), md_file.parent, media_map), lang)
+            back_html = resolve_tts(resolve_images(md_to_html(back_md), md_file.parent, media_map), lang)
 
             cards.append({
                 "type": card_type,
@@ -228,7 +294,10 @@ def build_models(deck_name: str, subject_dir: Path) -> dict:
             templates=[{
                 "name": "Cloze",
                 "qfmt": "{{cloze:Text}}",
-                "afmt": "{{cloze:Text}}<br>{{Extra}}",
+                "afmt": (
+                    "{{cloze:Text}}"
+                    '{{#Extra}}<hr id=answer><div class="extra">{{Extra}}</div>{{/Extra}}'
+                ),
             }],
             model_type=genanki.Model.CLOZE,
             css=css,
@@ -249,6 +318,7 @@ def build_subject(subject_dir: Path, output_dir: Path) -> Path | None:
     config = yaml.safe_load(deck_config_path.read_text(encoding="utf-8"))
     deck_name = config["name"]
     deck_id = config.get("id") or make_id(deck_name)
+    tts_lang = str(config.get("tts_lang") or TTS_LANG_DEFAULT)
     _validate_id(deck_id, f"deck.yaml 'id' в {subject_dir.name}")
 
     models = build_models(deck_name, subject_dir)
@@ -277,7 +347,7 @@ def build_subject(subject_dir: Path, output_dir: Path) -> Path | None:
         for md_file in md_files:
             print(f"  {md_file.relative_to(subject_dir)}")
             try:
-                cards = parse_cards(md_file, media_map)
+                cards = parse_cards(md_file, media_map, tts_lang)
             except Exception as e:
                 print(f"  ERROR in {md_file}: {e}", file=sys.stderr)
                 continue
@@ -319,7 +389,7 @@ def build_subject(subject_dir: Path, output_dir: Path) -> Path | None:
             for md_file in sorted(subdeck_dir.glob("*.md")):
                 print(f"  {md_file.relative_to(subject_dir)}")
                 try:
-                    cards = parse_cards(md_file, media_map)
+                    cards = parse_cards(md_file, media_map, tts_lang)
                 except Exception as e:
                     print(f"  ERROR in {md_file}: {e}", file=sys.stderr)
                     continue
