@@ -70,9 +70,11 @@ def tts_url(phrase: str, lang: str) -> str:
     Возвращает именно ссылку — аудио не скачивается и не попадает в .apkg.
     Anki открывает такую ссылку во внешнем браузере, колода остаётся лёгкой.
     """
+    # safe="" — в значении query-параметра экранируется всё, включая "/",
+    # иначе фраза вроде "and/or" даст неоднозначный URL
     return (
         "https://translate.google.com/translate_tts"
-        f"?ie=UTF-8&client=tw-ob&tl={quote(lang)}&q={quote(phrase)}"
+        f"?ie=UTF-8&client=tw-ob&tl={quote(lang, safe='')}&q={quote(phrase, safe='')}"
     )
 
 
