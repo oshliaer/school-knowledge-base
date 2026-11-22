@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import re
 import sys
+import uuid
 from html import escape as html_escape
 from html import unescape as html_unescape
 from pathlib import Path
@@ -54,8 +55,6 @@ _md = markdown.Markdown(extensions=["tables", "fenced_code", "nl2br"])
 # показывается сырым текстом (\pm, \Delta, \frac). Поэтому математику
 # вынимаем из markdown до конвертации и возвращаем в готовый HTML.
 _MATH_RE = re.compile(r"\\\(.+?\\\)|\\\[.+?\\\]", re.S)
-_MATH_TOKEN_TMPL = "@@MATH{}@@"
-_MATH_TOKEN_RE = re.compile(r"@@MATH(\d+)@@")
 
 
 def _escape_math(text: str) -> str:
@@ -65,14 +64,29 @@ def _escape_math(text: str) -> str:
     )
 
 
+def _math_prefix(text: str) -> str:
+    """Метка плейсхолдера, которой заведомо нет в тексте карточки.
+
+    Префикс случайный и новый на каждый вызов: если в карточке встретится
+    готовая последовательность вида @@MATH0@@, общая метка заменила бы
+    авторский текст формулой или упала на IndexError. Восстанавливаем только
+    плейсхолдеры с этим префиксом.
+    """
+    while True:
+        prefix = f"@@MATH{uuid.uuid4().hex[:12]}"
+        if prefix not in text:
+            return prefix
+
+
 def md_to_html(text: str) -> str:
-    # 1. Прячем формулы: placeholder состоит из обычных символов, markdown его
-    #    не трогает, а обратная подстановка возвращает LaTeX как есть.
+    # 1. Прячем формулы: метка уникальна для вызова, markdown её не трогает,
+    #    а обратная подстановка возвращает LaTeX как есть.
+    prefix = _math_prefix(text)
     math_spans: list[str] = []
 
     def stash(m):
         math_spans.append(m.group(0))
-        return _MATH_TOKEN_TMPL.format(len(math_spans) - 1)
+        return f"{prefix}Z{len(math_spans) - 1}@@"
 
     text = _MATH_RE.sub(stash, text)
 
@@ -82,7 +96,8 @@ def md_to_html(text: str) -> str:
 
     # 3. Возвращаем формулы на место (экранируя лишь < > & — LaTeX не меняем).
     if math_spans:
-        html = _MATH_TOKEN_RE.sub(
+        token_re = re.compile(re.escape(prefix) + r"Z(\d+)@@")
+        html = token_re.sub(
             lambda m: _escape_math(math_spans[int(m.group(1))]), html
         )
     return html
