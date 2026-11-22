@@ -48,10 +48,44 @@ def _validate_id(value: int, label: str) -> None:
 
 _md = markdown.Markdown(extensions=["tables", "fenced_code", "nl2br"])
 
+# Python-Markdown считает \( \) \[ \] \{ \} экранированием знаков препинания
+# и выбрасывает обратную косую черту. Для Anki это катастрофа: делимитеры
+# MathJax \(...\) и \[...\] превращаются в обычные скобки, и формула
+# показывается сырым текстом (\pm, \Delta, \frac). Поэтому математику
+# вынимаем из markdown до конвертации и возвращаем в готовый HTML.
+_MATH_RE = re.compile(r"\\\(.+?\\\)|\\\[.+?\\\]", re.S)
+_MATH_TOKEN_TMPL = "@@MATH{}@@"
+_MATH_TOKEN_RE = re.compile(r"@@MATH(\d+)@@")
+
+
+def _escape_math(text: str) -> str:
+    """Экранирует только символы, ломающие HTML, не трогая LaTeX."""
+    return (
+        text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    )
+
 
 def md_to_html(text: str) -> str:
+    # 1. Прячем формулы: placeholder состоит из обычных символов, markdown его
+    #    не трогает, а обратная подстановка возвращает LaTeX как есть.
+    math_spans: list[str] = []
+
+    def stash(m):
+        math_spans.append(m.group(0))
+        return _MATH_TOKEN_TMPL.format(len(math_spans) - 1)
+
+    text = _MATH_RE.sub(stash, text)
+
+    # 2. Конвертируем markdown.
     _md.reset()
-    return _md.convert(text)
+    html = _md.convert(text)
+
+    # 3. Возвращаем формулы на место (экранируя лишь < > & — LaTeX не меняем).
+    if math_spans:
+        html = _MATH_TOKEN_RE.sub(
+            lambda m: _escape_math(math_spans[int(m.group(1))]), html
+        )
+    return html
 
 
 TTS_LANG_DEFAULT = "en"
