@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import re
 import sys
+import uuid
 from html import escape as html_escape
 from html import unescape as html_unescape
 from pathlib import Path
@@ -48,10 +49,58 @@ def _validate_id(value: int, label: str) -> None:
 
 _md = markdown.Markdown(extensions=["tables", "fenced_code", "nl2br"])
 
+# Python-Markdown считает \( \) \[ \] \{ \} экранированием знаков препинания
+# и выбрасывает обратную косую черту. Для Anki это катастрофа: делимитеры
+# MathJax \(...\) и \[...\] превращаются в обычные скобки, и формула
+# показывается сырым текстом (\pm, \Delta, \frac). Поэтому математику
+# вынимаем из markdown до конвертации и возвращаем в готовый HTML.
+_MATH_RE = re.compile(r"\\\(.+?\\\)|\\\[.+?\\\]", re.S)
+
+
+def _escape_math(text: str) -> str:
+    """Экранирует только символы, ломающие HTML, не трогая LaTeX."""
+    return (
+        text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    )
+
+
+def _math_prefix(text: str) -> str:
+    """Метка плейсхолдера, которой заведомо нет в тексте карточки.
+
+    Префикс случайный и новый на каждый вызов: если в карточке встретится
+    готовая последовательность вида @@MATH0@@, общая метка заменила бы
+    авторский текст формулой или упала на IndexError. Восстанавливаем только
+    плейсхолдеры с этим префиксом.
+    """
+    while True:
+        prefix = f"@@MATH{uuid.uuid4().hex[:12]}"
+        if prefix not in text:
+            return prefix
+
 
 def md_to_html(text: str) -> str:
+    # 1. Прячем формулы: метка уникальна для вызова, markdown её не трогает,
+    #    а обратная подстановка возвращает LaTeX как есть.
+    prefix = _math_prefix(text)
+    math_spans: list[str] = []
+
+    def stash(m):
+        math_spans.append(m.group(0))
+        return f"{prefix}Z{len(math_spans) - 1}@@"
+
+    text = _MATH_RE.sub(stash, text)
+
+    # 2. Конвертируем markdown.
     _md.reset()
-    return _md.convert(text)
+    html = _md.convert(text)
+
+    # 3. Возвращаем формулы на место (экранируя лишь < > & — LaTeX не меняем).
+    if math_spans:
+        token_re = re.compile(re.escape(prefix) + r"Z(\d+)@@")
+        html = token_re.sub(
+            lambda m: _escape_math(math_spans[int(m.group(1))]), html
+        )
+    return html
 
 
 TTS_LANG_DEFAULT = "en"
